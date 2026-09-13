@@ -2,7 +2,8 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import ExecuteProcess, SetEnvironmentVariable
+from launch.actions import ExecuteProcess, SetEnvironmentVariable, DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import xacro
 
@@ -18,6 +19,13 @@ def generate_launch_description():
     # Process Xacro to URDF XML string
     robot_description_doc = xacro.process_file(xacro_file)
     robot_description_content = robot_description_doc.toxml()
+
+    # Launch arguments
+    human_mode_arg = DeclareLaunchArgument(
+        'human_mode',
+        default_value='auto',
+        description='Human control mode: auto (autonomous patrol) or manual (keyboard teleop)'
+    )
 
     # Environment variable for Gazebo models resource path
     set_gz_resource_path = SetEnvironmentVariable(
@@ -85,7 +93,8 @@ def generate_launch_description():
         name='human_controller',
         output='screen',
         parameters=[{
-            'use_sim_time': True
+            'use_sim_time': True,
+            'mode': LaunchConfiguration('human_mode'),
         }]
     )
 
@@ -101,6 +110,7 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        human_mode_arg,
         set_gz_resource_path,
         start_gazebo,
         robot_state_publisher_node,

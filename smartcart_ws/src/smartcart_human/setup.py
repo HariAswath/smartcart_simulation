@@ -21,6 +21,7 @@ setup(
     entry_points={
         'console_scripts': [
             'human_controller = smartcart_human.human_controller:main',
+            'human_teleop = smartcart_human.human_teleop:main',
             'follow_controller = smartcart_human.follow_controller:main',
             'rfid_simulator = smartcart_human.rfid_simulator:main',
         ],
