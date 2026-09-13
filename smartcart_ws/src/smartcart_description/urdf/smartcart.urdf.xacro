@@ -1,194 +1,197 @@
 <?xml version="1.0"?>
 <robot name="smartcart" xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Materials -->
-  <material name="blue">
-    <color rgba="0.1 0.3 0.8 1.0"/>
-  </material>
-  <material name="dark_grey">
-    <color rgba="0.2 0.2 0.2 1.0"/>
-  </material>
-  <material name="black">
-    <color rgba="0.05 0.05 0.05 1.0"/>
-  </material>
-  <material name="red">
-    <color rgba="0.8 0.1 0.1 1.0"/>
+  <!-- ==================================================================== -->
+  <!-- Materials & Colors matching cart.jpg reference design                -->
+  <!-- ==================================================================== -->
+  <material name="metallic_dark">
+    <color rgba="0.18 0.18 0.20 1.0"/>
   </material>
 
-  <!-- Base Link -->
+  <material name="brushed_aluminum">
+    <color rgba="0.82 0.84 0.86 1.0"/>
+  </material>
+
+  <material name="tire_rubber">
+    <color rgba="0.08 0.08 0.08 1.0"/>
+  </material>
+
+  <material name="rim_silver">
+    <color rgba="0.90 0.90 0.92 1.0"/>
+  </material>
+
+  <material name="sensor_red">
+    <color rgba="0.85 0.15 0.15 1.0"/>
+  </material>
+
+  <material name="metal_hardware">
+    <color rgba="0.75 0.75 0.78 1.0"/>
+  </material>
+
+  <!-- ==================================================================== -->
+  <!-- Base Footprint (Root dummy link for KDL & planar navigation)         -->
+  <!-- ==================================================================== -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 0.15" rpy="0 0 0"/>
+  </joint>
+
+  <!-- ==================================================================== -->
+  <!-- Base Link: Heavy-duty 4WD Chassis matching cart.jpg                  -->
+  <!-- ==================================================================== -->
   <link name="base_link">
     <inertial>
-      <origin xyz="0 0 0.15" rpy="0 0 0"/>
-      <mass value="8.0"/>
-      <inertia ixx="0.3000" ixy="0.0" ixz="0.0"
-               iyy="0.4867" iyz="0.0"
-               izz="0.6667"/>
+      <!-- Center of mass lowered for rock-solid stability -->
+      <origin xyz="0 0 -0.02" rpy="0 0 0"/>
+      <mass value="15.0"/>
+      <inertia ixx="0.3136" ixy="0.0" ixz="0.0"
+               iyy="0.6730" iyz="0.0"
+               izz="0.8656"/>
     </inertial>
+
+    <!-- Main Enclosure Body (Dark Gunmetal Box) -->
     <visual>
-      <origin xyz="0 0 0.15" rpy="0 0 0"/>
+      <origin xyz="0 0 0.01" rpy="0 0 0"/>
       <geometry>
-        <box size="0.8 0.6 0.3"/>
+        <box size="0.66 0.44 0.20"/>
       </geometry>
-      <material name="blue"/>
+      <material name="metallic_dark"/>
     </visual>
-    <collision>
-      <origin xyz="0 0 0.15" rpy="0 0 0"/>
+
+    <!-- Top Brushed Aluminum Deck Plate -->
+    <visual>
+      <origin xyz="0 0 0.115" rpy="0 0 0"/>
       <geometry>
-        <box size="0.8 0.6 0.3"/>
+        <box size="0.68 0.46 0.01"/>
+      </geometry>
+      <material name="brushed_aluminum"/>
+    </visual>
+
+    <!-- Front Hitch / Eyelet Hardware (Visual Detail from cart.jpg) -->
+    <visual>
+      <origin xyz="0.335 0.0 -0.04" rpy="1.570796 0 0"/>
+      <geometry>
+        <cylinder radius="0.02" length="0.015"/>
+      </geometry>
+      <material name="metal_hardware"/>
+    </visual>
+
+    <!-- Front Switch / Port Detail -->
+    <visual>
+      <origin xyz="0.335 0.08 0.02" rpy="0 1.570796 0"/>
+      <geometry>
+        <cylinder radius="0.012" length="0.03"/>
+      </geometry>
+      <material name="metal_hardware"/>
+    </visual>
+
+    <!-- Chassis Collision Geometry (Elevated 5cm above ground clearance) -->
+    <collision>
+      <origin xyz="0 0 0.01" rpy="0 0 0"/>
+      <geometry>
+        <box size="0.66 0.44 0.19"/>
       </geometry>
     </collision>
   </link>
 
   <gazebo reference="base_link">
     <material>
-      <ambient>0.1 0.3 0.8 1.0</ambient>
-      <diffuse>0.1 0.3 0.8 1.0</diffuse>
-      <specular>0.2 0.2 0.2 1.0</specular>
+      <ambient>0.18 0.18 0.20 1.0</ambient>
+      <diffuse>0.20 0.20 0.22 1.0</diffuse>
+      <specular>0.4 0.4 0.45 1.0</specular>
     </material>
   </gazebo>
 
-  <!-- Left Wheel -->
-  <link name="left_wheel_link">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="1.0"/>
-      <inertia ixx="0.006158" ixy="0.0" ixz="0.0"
-               iyy="0.011250" iyz="0.0"
-               izz="0.006158"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry>
-        <cylinder radius="0.15" length="0.08"/>
-      </geometry>
-      <material name="black"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry>
-        <cylinder radius="0.15" length="0.08"/>
-      </geometry>
-    </collision>
-  </link>
+  <!-- ==================================================================== -->
+  <!-- Xacro Macro for Rugged 4WD Wheel Assemblies                          -->
+  <!-- ==================================================================== -->
+  <xacro:macro name="skid_wheel" params="prefix x_reflect y_reflect">
+    <link name="${prefix}_wheel_link">
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="2.0"/>
+        <inertia ixx="0.01292" ixy="0.0" ixz="0.0"
+                 iyy="0.02250" iyz="0.0"
+                 izz="0.01292"/>
+      </inertial>
 
-  <joint name="left_wheel_joint" type="continuous">
-    <parent link="base_link"/>
-    <child link="left_wheel_link"/>
-    <origin xyz="0 0.35 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-  </joint>
+      <!-- Outer Tire Tread (Dark Rugged Rubber) -->
+      <visual>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="0.15" length="0.10"/>
+        </geometry>
+        <material name="tire_rubber"/>
+      </visual>
 
-  <gazebo reference="left_wheel_link">
-    <mu1>1.0</mu1>
-    <mu2>1.0</mu2>
-    <material>
-      <ambient>0.05 0.05 0.05 1.0</ambient>
-      <diffuse>0.05 0.05 0.05 1.0</diffuse>
-      <specular>0.1 0.1 0.1 1.0</specular>
-    </material>
-  </gazebo>
+      <!-- Inner Wheel Rim / Dish (Silver/White Dish from cart.jpg) -->
+      <visual>
+        <origin xyz="0 ${y_reflect * 0.01} 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="0.10" length="0.102"/>
+        </geometry>
+        <material name="rim_silver"/>
+      </visual>
 
-  <!-- Right Wheel -->
-  <link name="right_wheel_link">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="1.0"/>
-      <inertia ixx="0.006158" ixy="0.0" ixz="0.0"
-               iyy="0.011250" iyz="0.0"
-               izz="0.006158"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry>
-        <cylinder radius="0.15" length="0.08"/>
-      </geometry>
-      <material name="black"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
-      <geometry>
-        <cylinder radius="0.15" length="0.08"/>
-      </geometry>
-    </collision>
-  </link>
+      <!-- Wheel Collision Cylinder -->
+      <collision>
+        <origin xyz="0 0 0" rpy="1.57079632679 0 0"/>
+        <geometry>
+          <cylinder radius="0.15" length="0.10"/>
+        </geometry>
+      </collision>
+    </link>
 
-  <joint name="right_wheel_joint" type="continuous">
-    <parent link="base_link"/>
-    <child link="right_wheel_link"/>
-    <origin xyz="0 -0.35 0" rpy="0 0 0"/>
-    <axis xyz="0 1 0"/>
-  </joint>
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <origin xyz="${x_reflect * 0.22} ${y_reflect * 0.28} 0.0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <dynamics damping="0.1" friction="0.05"/>
+    </joint>
 
-  <gazebo reference="right_wheel_link">
-    <mu1>1.0</mu1>
-    <mu2>1.0</mu2>
-    <material>
-      <ambient>0.05 0.05 0.05 1.0</ambient>
-      <diffuse>0.05 0.05 0.05 1.0</diffuse>
-      <specular>0.1 0.1 0.1 1.0</specular>
-    </material>
-  </gazebo>
+    <gazebo reference="${prefix}_wheel_link">
+      <mu1>1.0</mu1>
+      <mu2>0.8</mu2>
+      <material>
+        <ambient>0.08 0.08 0.08 1.0</ambient>
+        <diffuse>0.10 0.10 0.10 1.0</diffuse>
+        <specular>0.2 0.2 0.2 1.0</specular>
+      </material>
+    </gazebo>
+  </xacro:macro>
 
-  <!-- Caster Link (Rear) -->
-  <link name="caster_link">
-    <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.5"/>
-      <inertia ixx="0.0005" ixy="0.0" ixz="0.0"
-               iyy="0.0005" iyz="0.0"
-               izz="0.0005"/>
-    </inertial>
-    <visual>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <sphere radius="0.05"/>
-      </geometry>
-      <material name="dark_grey"/>
-    </visual>
-    <collision>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
-      <geometry>
-        <sphere radius="0.05"/>
-      </geometry>
-    </collision>
-  </link>
+  <!-- Instantiate 4 Wheels -->
+  <xacro:skid_wheel prefix="front_left"  x_reflect="1"  y_reflect="1"/>
+  <xacro:skid_wheel prefix="rear_left"   x_reflect="-1" y_reflect="1"/>
+  <xacro:skid_wheel prefix="front_right" x_reflect="1"  y_reflect="-1"/>
+  <xacro:skid_wheel prefix="rear_right"  x_reflect="-1" y_reflect="-1"/>
 
-  <joint name="caster_joint" type="fixed">
-    <parent link="base_link"/>
-    <child link="caster_link"/>
-    <origin xyz="-0.30 0 -0.10" rpy="0 0 0"/>
-  </joint>
-
-  <gazebo reference="caster_link">
-    <mu1>0.001</mu1>
-    <mu2>0.001</mu2>
-    <material>
-      <ambient>0.2 0.2 0.2 1.0</ambient>
-      <diffuse>0.2 0.2 0.2 1.0</diffuse>
-      <specular>0.1 0.1 0.1 1.0</specular>
-    </material>
-  </gazebo>
-
-  <!-- LiDAR Link -->
+  <!-- ==================================================================== -->
+  <!-- 2D Planar LiDAR Sensor (Mounted high on top aluminum deck)            -->
+  <!-- ==================================================================== -->
   <link name="lidar_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
-      <mass value="0.2"/>
-      <inertia ixx="0.00015" ixy="0.0" ixz="0.0"
-               iyy="0.00015" iyz="0.0"
-               izz="0.00025"/>
+      <mass value="0.25"/>
+      <inertia ixx="0.0002" ixy="0.0" ixz="0.0"
+               iyy="0.0002" iyz="0.0"
+               izz="0.0003"/>
     </inertial>
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.04"/>
+        <cylinder radius="0.045" length="0.04"/>
       </geometry>
-      <material name="red"/>
+      <material name="sensor_red"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <cylinder radius="0.05" length="0.04"/>
+        <cylinder radius="0.045" length="0.04"/>
       </geometry>
     </collision>
   </link>
@@ -196,10 +199,9 @@
   <joint name="lidar_joint" type="fixed">
     <parent link="base_link"/>
     <child link="lidar_link"/>
-    <origin xyz="0.20 0 0.32" rpy="0 0 0"/>
+    <origin xyz="0.22 0 0.14" rpy="0 0 0"/>
   </joint>
 
-  <!-- LiDAR Gazebo Sensor -->
   <gazebo reference="lidar_link">
     <sensor name="lidar" type="gpu_lidar">
       <topic>/scan</topic>
@@ -220,7 +222,7 @@
           </vertical>
         </scan>
         <range>
-          <min>0.12</min>
+          <min>0.15</min>
           <max>10.0</max>
           <resolution>0.01</resolution>
         </range>
@@ -229,13 +231,15 @@
       <visualize>true</visualize>
     </sensor>
     <material>
-      <ambient>0.8 0.1 0.1 1.0</ambient>
-      <diffuse>0.8 0.1 0.1 1.0</diffuse>
-      <specular>0.2 0.2 0.2 1.0</specular>
+      <ambient>0.85 0.15 0.15 1.0</ambient>
+      <diffuse>0.85 0.15 0.15 1.0</diffuse>
+      <specular>0.3 0.3 0.3 1.0</specular>
     </material>
   </gazebo>
 
-  <!-- Camera Link (Optional) -->
+  <!-- ==================================================================== -->
+  <!-- Forward Camera Sensor (Front face centered)                           -->
+  <!-- ==================================================================== -->
   <link name="camera_link">
     <inertial>
       <origin xyz="0 0 0" rpy="0 0 0"/>
@@ -247,14 +251,14 @@
     <visual>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.05 0.05"/>
+        <box size="0.04 0.04 0.04"/>
       </geometry>
-      <material name="dark_grey"/>
+      <material name="metallic_dark"/>
     </visual>
     <collision>
       <origin xyz="0 0 0" rpy="0 0 0"/>
       <geometry>
-        <box size="0.05 0.05 0.05"/>
+        <box size="0.04 0.04 0.04"/>
       </geometry>
     </collision>
   </link>
@@ -262,10 +266,9 @@
   <joint name="camera_joint" type="fixed">
     <parent link="base_link"/>
     <child link="camera_link"/>
-    <origin xyz="0.40 0 0.25" rpy="0 0 0"/>
+    <origin xyz="0.34 0 0.02" rpy="0 0 0"/>
   </joint>
 
-  <!-- Camera Gazebo Sensor -->
   <gazebo reference="camera_link">
     <sensor name="camera" type="camera">
       <topic>/camera/image_raw</topic>
@@ -288,25 +291,32 @@
     <material>
       <ambient>0.2 0.2 0.2 1.0</ambient>
       <diffuse>0.2 0.2 0.2 1.0</diffuse>
-      <specular>0.1 0.1 0.1 1.0</specular>
+      <specular>0.2 0.2 0.2 1.0</specular>
     </material>
   </gazebo>
 
-  <!-- Gazebo Plugins -->
+  <!-- ==================================================================== -->
+  <!-- Gazebo Harmonic 4WD Skid-Steer DiffDrive System Plugin               -->
+  <!-- ==================================================================== -->
   <gazebo>
     <plugin
       filename="gz-sim-diff-drive-system"
       name="gz::sim::systems::DiffDrive">
-      <left_joint>left_wheel_joint</left_joint>
-      <right_joint>right_wheel_joint</right_joint>
-      <wheel_separation>0.7</wheel_separation>
+      <!-- 4WD Joint configuration -->
+      <left_joint>front_left_wheel_joint</left_joint>
+      <left_joint>rear_left_wheel_joint</left_joint>
+      <right_joint>front_right_wheel_joint</right_joint>
+      <right_joint>rear_right_wheel_joint</right_joint>
+      <wheel_separation>0.56</wheel_separation>
       <wheel_radius>0.15</wheel_radius>
       <topic>/cmd_vel</topic>
       <odom_topic>/wheel/odometry</odom_topic>
       <frame_id>odom</frame_id>
-      <child_frame_id>base_link</child_frame_id>
+      <child_frame_id>base_footprint</child_frame_id>
       <odom_publisher_frequency>30</odom_publisher_frequency>
       <tf_topic>/tf</tf_topic>
+      <max_linear_acceleration>2.0</max_linear_acceleration>
+      <max_angular_acceleration>3.0</max_angular_acceleration>
     </plugin>
 
     <plugin

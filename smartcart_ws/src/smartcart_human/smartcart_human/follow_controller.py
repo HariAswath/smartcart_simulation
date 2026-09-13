@@ -2,9 +2,9 @@
 """
 Follow Controller Node for SmartCart Simulation.
 
-Tracks simulated human position, applies proportional differential-drive
+Tracks simulated human position, applies smooth proportional differential-drive
 control, monitors LiDAR front sector for safety emergency stop, and handles
-lost-human timeouts.
+lost-human timeouts with stable turning and forward velocity.
 """
 
 import math
@@ -17,13 +17,15 @@ from nav_msgs.msg import Odometry
 
 # Controller Constants (Authoritative Specification Contract)
 TARGET_DISTANCE = 1.2          # Target following distance in meters
+DEADBAND_DISTANCE = 0.05       # Deadband around target distance (m)
 K_DISTANCE = 0.5               # Proportional gain for linear velocity
-K_ANGLE = 1.0                  # Proportional gain for angular velocity
-MAX_LINEAR_SPEED = 0.5         # Maximum linear speed (m/s)
-MAX_ANGULAR_SPEED = 1.0        # Maximum angular speed (rad/s)
-OBSTACLE_STOP_DISTANCE = 0.6   # Emergency stop threshold (meters)
+K_ANGLE = 0.8                  # Proportional gain for angular velocity
+MAX_LINEAR_SPEED = 0.45        # Maximum linear speed (m/s)
+MAX_ANGULAR_SPEED = 0.8        # Maximum angular speed (rad/s)
+OBSTACLE_STOP_DISTANCE = 0.60  # Emergency stop threshold (meters)
 HUMAN_TIMEOUT = 1.0            # Lost human timeout in seconds
 FRONT_SECTOR_RAD = math.pi / 6 # ±30 degrees front safety cone
+MIN_VALID_LIDAR_DIST = 0.20    # Filter internal reflections
 
 
 class FollowController(Node):
@@ -72,14 +74,18 @@ class FollowController(Node):
         self.last_scan = msg
 
     def odom_callback(self, msg: Odometry):
-        """Extract planar robot pose (x, y, yaw) from odometry."""
+        """Extract planar robot pose (x, y, yaw) from odometry using full 3D quaternion."""
         self.robot_x = msg.pose.pose.position.x
         self.robot_y = msg.pose.pose.position.y
 
-        # Quaternion to planar yaw
+        qx = msg.pose.pose.orientation.x
+        qy = msg.pose.pose.orientation.y
         qz = msg.pose.pose.orientation.z
         qw = msg.pose.pose.orientation.w
-        self.robot_yaw = 2.0 * math.atan2(qz, qw)
+
+        siny_cosp = 2.0 * (qw * qz + qx * qy)
+        cosy_cosp = 1.0 - 2.0 * (qy * qy + qz * qz)
+        self.robot_yaw = math.atan2(siny_cosp, cosy_cosp)
         self.odom_received = True
 
     def get_human_age(self) -> float:
@@ -113,7 +119,7 @@ class FollowController(Node):
     def get_front_min_range(self) -> float:
         """
         Scan LiDAR ranges in the front ±30 degree cone.
-        Returns minimum valid range in meters, or infinity if no obstacles.
+        Returns minimum valid obstacle range in meters, ignoring reflections < 0.20m.
         """
         if self.last_scan is None:
             return float('inf')
@@ -126,7 +132,8 @@ class FollowController(Node):
             if -FRONT_SECTOR_RAD <= angle <= FRONT_SECTOR_RAD:
                 if math.isnan(r) or math.isinf(r):
                     continue
-                if r < scan.range_min or r > scan.range_max:
+                # Ignore out-of-range returns
+                if r < max(scan.range_min, MIN_VALID_LIDAR_DIST) or r > scan.range_max:
                     continue
                 if r < front_min:
                     front_min = r
@@ -137,22 +144,30 @@ class FollowController(Node):
         """Check if any front obstacle is below the emergency stop threshold."""
         return front_min < OBSTACLE_STOP_DISTANCE
 
-    def calculate_follow_velocity(self, distance: float, human_y: float) -> tuple:
+    def calculate_follow_velocity(self, distance: float, human_x: float, human_y: float) -> tuple:
         """
-        Calculate clamped linear and angular velocities.
+        Calculate smooth, clamped linear and angular velocities.
+        Rotates on the spot if human is behind/lateral; drives forward when facing human.
         Returns: (linear_x, angular_z)
         """
-        # Linear velocity (proportional to distance error)
-        if distance <= TARGET_DISTANCE:
-            linear_x = 0.0
-        else:
-            e_d = distance - TARGET_DISTANCE
-            linear_x = K_DISTANCE * e_d
-            linear_x = max(0.0, min(linear_x, MAX_LINEAR_SPEED))
+        # Bearing angle to human in robot local frame (-pi to +pi)
+        bearing_angle = math.atan2(human_y, human_x)
 
-        # Angular velocity (proportional to lateral displacement)
-        angular_z = K_ANGLE * human_y
+        # Proportional angular velocity to turn toward human
+        angular_z = K_ANGLE * bearing_angle
         angular_z = max(-MAX_ANGULAR_SPEED, min(angular_z, MAX_ANGULAR_SPEED))
+
+        # Only drive forward if human is in the forward half-plane and within ±45 deg cone
+        if human_x > 0.0 and abs(bearing_angle) < (math.pi / 4.0):
+            distance_error = distance - TARGET_DISTANCE
+            if distance_error <= DEADBAND_DISTANCE:
+                linear_x = 0.0
+            else:
+                linear_x = K_DISTANCE * (distance_error - DEADBAND_DISTANCE)
+                linear_x = max(0.0, min(linear_x, MAX_LINEAR_SPEED))
+        else:
+            # Target is to the side or behind: rotate to face target, do NOT drive forward
+            linear_x = 0.0
 
         return linear_x, angular_z
 
@@ -202,14 +217,14 @@ class FollowController(Node):
             human_x, human_y = self.calculate_relative_position(hx, hy)
             distance = self.calculate_distance(human_x, human_y)
 
-            if distance <= TARGET_DISTANCE:
+            if distance <= (TARGET_DISTANCE + DEADBAND_DISTANCE) and human_x > 0.0:
                 state = "TARGET_REACHED"
-                # Keep distance, but turn to face human if laterally offset
-                _, angular_z = self.calculate_follow_velocity(distance, human_y)
+                # Keep distance, but smoothly align with human if slightly offset
+                _, angular_z = self.calculate_follow_velocity(distance, human_x, human_y)
                 linear_x = 0.0
             else:
                 state = "FOLLOW"
-                linear_x, angular_z = self.calculate_follow_velocity(distance, human_y)
+                linear_x, angular_z = self.calculate_follow_velocity(distance, human_x, human_y)
 
             cmd = Twist()
             cmd.linear.x = float(linear_x)
