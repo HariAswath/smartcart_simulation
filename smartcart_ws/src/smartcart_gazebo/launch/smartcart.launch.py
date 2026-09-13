@@ -70,7 +70,20 @@ def generate_launch_description():
             '/wheel/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry',
             '/scan@sensor_msgs/msg/LaserScan[gz.msgs.LaserScan',
             '/camera/image_raw@sensor_msgs/msg/Image[gz.msgs.Image',
+            '/clock@rosgraph_msgs/msg/Clock[gz.msgs.Clock',
+            '/world/smartcart_world/set_pose@ros_gz_interfaces/srv/SetEntityPose',
         ],
+        parameters=[{
+            'use_sim_time': True
+        }]
+    )
+
+    # Human Controller Node
+    human_controller_node = Node(
+        package='smartcart_human',
+        executable='human_controller',
+        name='human_controller',
+        output='screen',
         parameters=[{
             'use_sim_time': True
         }]
@@ -81,5 +94,6 @@ def generate_launch_description():
         start_gazebo,
         robot_state_publisher_node,
         spawn_smartcart_node,
-        bridge_node
+        bridge_node,
+        human_controller_node
     ])
