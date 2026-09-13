@@ -89,11 +89,23 @@ def generate_launch_description():
         }]
     )
 
+    # Follow Controller Node
+    follow_controller_node = Node(
+        package='smartcart_human',
+        executable='follow_controller',
+        name='follow_controller',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True
+        }]
+    )
+
     return LaunchDescription([
         set_gz_resource_path,
         start_gazebo,
         robot_state_publisher_node,
         spawn_smartcart_node,
         bridge_node,
-        human_controller_node
+        human_controller_node,
+        follow_controller_node
     ])
