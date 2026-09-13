@@ -1,0 +1,22 @@
+# ROS 2 colcon build artifacts
+smartcart_ws/build/
+smartcart_ws/install/
+smartcart_ws/log/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Editor/OS
+.DS_Store
+.vscode/
+*.swp
+*.swo
+*~
+
+# Gazebo
+.gz/

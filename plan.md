@@ -21,10 +21,43 @@
 
 ---
 
+## Git Workflow Convention
+
+Every phase ends with a commit and push. Follow this pattern at the end of **every** phase:
+
+```bash
+cd ~/smartcart_simulation
+git add .
+git commit -m "phase <N>: <short description>"
+git push origin main
+```
+
+> **Rules:**
+> - Commit only after the phase's **verification pass criteria are met** (build passes, tests pass).
+> - Never commit broken or untested code.
+> - Use the exact commit message format shown per phase below.
+> - `build/`, `install/`, `log/` must be listed in `.gitignore` — do not commit generated build artifacts.
+
+### `.gitignore` (must exist at repo root)
+
+```
+smartcart_ws/build/
+smartcart_ws/install/
+smartcart_ws/log/
+__pycache__/
+*.pyc
+.DS_Store
+```
+
+---
+
 ## Final Source Tree (Target)
 
 ```
 smartcart_simulation/
+├── .gitignore
+├── plan.md
+├── SMARTCART_STANDALONE_SIMULATION_SPEC.md
 └── smartcart_ws/
     └── src/
         ├── smartcart_description/
@@ -67,7 +100,7 @@ smartcart_simulation/
 | `/scan` | LiDAR → controller | `sensor_msgs/msg/LaserScan` |
 | `/human/pose` | human node → controller | `geometry_msgs/msg/Pose` |
 | `/rfid/item` | RFID → consumer | `std_msgs/msg/String` |
-| `/wheel/odometry` | Gazebo → ROS | odometry |
+| `/wheel/odometry` | Gazebo → ROS | `nav_msgs/msg/Odometry` |
 | `/camera/image_raw` | camera → ROS | `sensor_msgs/msg/Image` (optional) |
 
 ---
@@ -90,6 +123,15 @@ smartcart_simulation/
 **Verification pass criteria:** All commands succeed with no errors.
 
 > ✅ Already verified — all checks pass.
+
+#### Git Step — Phase 0
+
+```bash
+cd ~/smartcart_simulation
+git add .gitignore plan.md
+git commit -m "phase 0: environment verified, plan and gitignore added"
+git push origin main
+```
 
 ---
 
@@ -123,7 +165,7 @@ smartcart_ws/src/smartcart_human/
   smartcart_human/rfid_simulator.py     (minimal stub)
 ```
 
-**CMake rule:** Only `install(DIRECTORY ...)` directories that actually exist on disk.
+**CMake rule:** Only `install(DIRECTORY ...)` directories that actually exist on disk. No stale install rules for absent directories.
 
 **Build & verify:**
 ```bash
@@ -135,6 +177,15 @@ colcon build
 **Pass criteria:**
 ```
 Summary: 3 packages finished
+```
+
+#### Git Step — Phase 1
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/
+git commit -m "phase 1: workspace scaffolding, 3 packages build successfully"
+git push origin main
 ```
 
 ---
@@ -166,9 +217,9 @@ Summary: 3 packages finished
 | `lidar_joint` | fixed | `base_link` → `lidar_link` | top center |
 | `camera_joint` | fixed | `base_link` → `camera_link` | front top |
 
-**Wheel axis orientation:** X axis — both wheels must share the same axis to produce straight forward motion in +X.
+**Wheel axis orientation:** X axis — both wheels rotate about X so robot moves in +X direction.
 
-**Gazebo plugins (inside `<gazebo>` tags or Gazebo-specific URDF extension):**
+**Gazebo plugins (inside `<gazebo>` tags):**
 
 1. `gz::sim::systems::DiffDrive`
    - `left_joint`: `left_wheel_joint`
@@ -187,20 +238,16 @@ Summary: 3 packages finished
 
 **LiDAR sensor (on `lidar_link`):**
 - type: `lidar`
-- horizontal samples: 360
-- angle_min: −π, angle_max: +π
+- horizontal samples: 360, angle: −π to +π
 - vertical samples: 1
 - range_min: 0.12, range_max: 10.0
 - update_rate: 10 Hz
-- Gazebo topic bridged to ROS `/scan`
 
 **Camera sensor (on `camera_link`, optional):**
 - type: `camera`
-- resolution: 320 × 240
-- update_rate: 10 Hz
-- Bridged to `/camera/image_raw`
+- resolution: 320 × 240, update_rate: 10 Hz
 
-**Inertia formula for box (mass m, x×y×z dimensions):**
+**Inertia formula for box (mass m, dimensions x × y × z):**
 ```
 Ixx = m/12 * (y² + z²)
 Iyy = m/12 * (x² + z²)
@@ -212,10 +259,19 @@ Izz = m/12 * (x² + y²)
 colcon build --packages-select smartcart_description
 source install/setup.bash
 ros2 run xacro xacro src/smartcart_description/urdf/smartcart.urdf.xacro
-# Must produce valid XML with no errors
+# Must produce valid URDF XML with no errors
 ```
 
-**Pass criteria:** `xacro` outputs valid URDF, no errors.
+**Pass criteria:** `xacro` outputs valid URDF, no errors or warnings about missing elements.
+
+#### Git Step — Phase 2
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_description/
+git commit -m "phase 2: SmartCart URDF/Xacro with diff drive, LiDAR, camera plugins"
+git push origin main
+```
 
 ---
 
@@ -227,39 +283,23 @@ ros2 run xacro xacro src/smartcart_description/urdf/smartcart.urdf.xacro
 
 **File:** `smartcart_gazebo/worlds/smartcart_world.sdf`
 
-**Layout (top-down view, 12 m × 8 m):**
-
-```
-+Y = 4.0
-         +--North wall-------------------------------+
-         |                                           |
-Shelf 4  |  [S4]                        [S1]  Shelf 1|
-Shelf 5  |  [S5]    CENTRAL AISLE       [S2]  Shelf 2|
-Shelf 6  |  [S6]         O (human x=2)  [S3]  Shelf 3|
-         |               C (cart  x=0)              |
-         |                                   [CHK]  |
-ENT→     |  <entrance gap>                          |
-         +--South wall-------------------------------+
--Y = -4.0
-```
-
 **World objects:**
 
-| Name | Geometry | Size (x × y × z m) | Position | Static |
+| Name | Geometry | Size (m) | Position | Static |
 |---|---|---|---|---|
 | Floor | plane | 12 × 8 | z=0 | ✅ |
 | Wall North | box | 12.0 × 0.15 × 2.5 | x=0, y=4.0, z=1.25 | ✅ |
 | Wall South | box | 12.0 × 0.15 × 2.5 | x=0, y=−4.0, z=1.25 | ✅ |
 | Wall East | box | 0.15 × 8.0 × 2.5 | x=6.0, y=0, z=1.25 | ✅ |
-| Wall West (left seg) | box | 0.15 × 3.5 × 2.5 | x=−6.0, y=2.25, z=1.25 | ✅ |
-| Wall West (right seg) | box | 0.15 × 3.5 × 2.5 | x=−6.0, y=−2.25, z=1.25 | ✅ |
+| Wall West left seg | box | 0.15 × 3.5 × 2.5 | x=−6.0, y=2.25, z=1.25 | ✅ |
+| Wall West right seg | box | 0.15 × 3.5 × 2.5 | x=−6.0, y=−2.25, z=1.25 | ✅ |
 | Checkout counter | box | 1.5 × 0.6 × 1.0 | x=4.5, y=3.2, z=0.5 | ✅ |
-| Shelf 1 (right-back) | box | 2.0 × 0.6 × 1.5 | x=3.0, y=−2.5, z=0.75 | ✅ |
-| Shelf 2 (right-mid) | box | 2.0 × 0.6 × 1.5 | x=0.0, y=−2.5, z=0.75 | ✅ |
-| Shelf 3 (right-front) | box | 2.0 × 0.6 × 1.5 | x=−3.0, y=−2.5, z=0.75 | ✅ |
-| Shelf 4 (left-back) | box | 2.0 × 0.6 × 1.5 | x=3.0, y=2.5, z=0.75 | ✅ |
-| Shelf 5 (left-mid) | box | 2.0 × 0.6 × 1.5 | x=0.0, y=2.5, z=0.75 | ✅ |
-| Shelf 6 (left-front) | box | 2.0 × 0.6 × 1.5 | x=−3.0, y=2.5, z=0.75 | ✅ |
+| Shelf 1 | box | 2.0 × 0.6 × 1.5 | x=3.0, y=−2.5, z=0.75 | ✅ |
+| Shelf 2 | box | 2.0 × 0.6 × 1.5 | x=0.0, y=−2.5, z=0.75 | ✅ |
+| Shelf 3 | box | 2.0 × 0.6 × 1.5 | x=−3.0, y=−2.5, z=0.75 | ✅ |
+| Shelf 4 | box | 2.0 × 0.6 × 1.5 | x=3.0, y=2.5, z=0.75 | ✅ |
+| Shelf 5 | box | 2.0 × 0.6 × 1.5 | x=0.0, y=2.5, z=0.75 | ✅ |
+| Shelf 6 | box | 2.0 × 0.6 × 1.5 | x=−3.0, y=2.5, z=0.75 | ✅ |
 | Obstacle demo box | box | 0.4 × 0.4 × 0.4 | x=4.0, y=0.0, z=0.2 | ✅ |
 
 **Physics:**
@@ -275,8 +315,6 @@ ENT→     |  <entrance gap>                          |
 - `smartcart_gazebo/models/human/model.config`
 - `smartcart_gazebo/models/human/model.sdf`
 
-Human geometry (all links with collision):
-
 | Link | Shape | Size | Mass |
 |---|---|---|---|
 | torso | box | 0.4 × 0.3 × 0.8 m | 50 kg |
@@ -286,16 +324,18 @@ Human geometry (all links with collision):
 | l_leg | box | 0.15 × 0.1 × 0.8 m | 5 kg |
 | r_leg | box | 0.15 × 0.1 × 0.8 m | 5 kg |
 
-**Initial pose:** x=2.0, y=0.0, z=0.0
+All links must have collision geometry (required for LiDAR detection).
+
+**Initial human pose:** x=2.0, y=0.0, z=0.0
 
 #### 3c — Launch File
 
 **File:** `smartcart_gazebo/launch/smartcart.launch.py`
 
-Starts in this order:
-1. Gazebo Harmonic → `gz sim -r smartcart_world.sdf`
-2. `robot_state_publisher` → publishes URDF from xacro
-3. `ros_gz_sim create` → spawns SmartCart at x=0, y=0, z=0.3, yaw=0
+Starts:
+1. Gazebo Harmonic with `smartcart_world.sdf`
+2. `robot_state_publisher` (xacro → URDF)
+3. `ros_gz_sim create` — spawns SmartCart at x=0, y=0, z=0.3, yaw=0
 
 **Build & verify:**
 ```bash
@@ -305,10 +345,19 @@ ros2 launch smartcart_gazebo smartcart.launch.py
 ```
 
 **Pass criteria:**
-- Gazebo opens showing supermarket environment.
+- Gazebo opens showing the supermarket.
 - SmartCart visible at origin.
 - Human visible at x=2.0.
-- No errors in terminal.
+- No red errors in terminal.
+
+#### Git Step — Phase 3
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_gazebo/
+git commit -m "phase 3: supermarket world SDF, human model, SmartCart spawn launch"
+git push origin main
+```
 
 ---
 
@@ -318,7 +367,7 @@ ros2 launch smartcart_gazebo smartcart.launch.py
 
 **No new files.** Plugin was defined in Phase 2 URDF.
 
-**Test commands:**
+**Test commands (with simulation running):**
 ```bash
 # Move forward
 ros2 topic pub --once /cmd_vel geometry_msgs/msg/Twist \
@@ -337,8 +386,19 @@ ros2 topic echo /wheel/odometry --once
 ```
 
 **Pass criteria:**
-- Robot moves forward, backward (via negative x), and rotates in Gazebo.
+- Robot moves forward, rotates on command in Gazebo.
 - `/wheel/odometry` publishes pose/twist data.
+
+> If any URDF/plugin fix is required, update `smartcart.urdf.xacro` and rebuild before committing.
+
+#### Git Step — Phase 4
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/
+git commit -m "phase 4: differential drive verified, odometry confirmed"
+git push origin main
+```
 
 ---
 
@@ -346,12 +406,9 @@ ros2 topic echo /wheel/odometry --once
 
 **Goal:** `/scan` publishes `sensor_msgs/msg/LaserScan` in ROS at ~10 Hz.
 
-**Addition to launch file:** ROS-Gazebo bridge process:
-```python
-ros_gz_bridge  --ros-args -p config_file:=<bridge_config_yaml>
-```
+**Addition to launch file:** ROS-Gazebo bridge for `/scan` and `/wheel/odometry`.
 
-Bridge config YAML:
+Bridge configuration (YAML file or inline launch parameters):
 ```yaml
 - ros_topic_name: /scan
   gz_topic_name: /scan
@@ -379,8 +436,18 @@ ros2 topic echo /scan --once
 ```
 
 **Pass criteria:**
-- `/scan` at ~10 Hz with `range_min=0.12`, `range_max=10.0`.
-- Ranges change when an object is placed in front.
+- `/scan` publishes at ~10 Hz.
+- `range_min=0.12`, `range_max=10.0`.
+- Ranges change when an object is placed in front of LiDAR.
+
+#### Git Step — Phase 5
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_gazebo/
+git commit -m "phase 5: LiDAR and odometry ROS-Gazebo bridge verified"
+git push origin main
+```
 
 ---
 
@@ -392,14 +459,16 @@ ros2 topic echo /scan --once
 
 **Algorithm:**
 - Node name: `human_controller`
-- Wait for `SetEntityPose` Gazebo service.
+- Wait for Gazebo `SetEntityPose` service before starting movement.
 - Oscillate human: x moves 2.0 m → 6.0 m → 2.0 m at 0.2 m/s, y=0.
-- Timer period: 0.1 s.
-- At each step: call SetEntityPose service → publish `geometry_msgs/msg/Pose` to `/human/pose`.
+- Timer period: 0.1 s (10 Hz).
+- Each step: call SetEntityPose → publish `geometry_msgs/msg/Pose` to `/human/pose`.
 
-**Key implementation note:**
-- Verify actual service name at runtime: `ros2 service list | grep pose`
-- Use `ros_gz_interfaces/srv/SetEntityPose` (check field names with `ros2 interface show`)
+**Key implementation note:** Verify the exact service name at runtime:
+```bash
+ros2 service list | grep pose
+ros2 interface show ros_gz_interfaces/srv/SetEntityPose
+```
 
 **Added to launch file:** `human_controller` node.
 
@@ -414,6 +483,15 @@ ros2 topic echo /human/pose
 - `position.x` oscillates between 2.0 and 6.0.
 - Human model moves visibly in Gazebo.
 
+#### Git Step — Phase 6
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_human/ smartcart_ws/src/smartcart_gazebo/launch/
+git commit -m "phase 6: human_controller node, /human/pose publishing, human moves in Gazebo"
+git push origin main
+```
+
 ---
 
 ### PHASE 7 — Human-Follow Controller
@@ -422,7 +500,7 @@ ros2 topic echo /human/pose
 
 **File:** `smartcart_human/smartcart_human/follow_controller.py`
 
-**Controller constants (from spec section I):**
+**Controller constants (exact from spec §I):**
 ```python
 TARGET_DISTANCE        = 1.2   # m
 K_DISTANCE             = 0.5
@@ -436,32 +514,30 @@ HUMAN_TIMEOUT          = 1.0   # s
 **Subscriptions:**
 - `/human/pose` → `geometry_msgs/msg/Pose`
 - `/scan` → `sensor_msgs/msg/LaserScan`
-- `/wheel/odometry` → `nav_msgs/msg/Odometry` (provides `rx`, `ry`, `yaw`)
+- `/wheel/odometry` → `nav_msgs/msg/Odometry` (provides robot `rx`, `ry`, `yaw`)
 
 **Publisher:** `/cmd_vel` → `geometry_msgs/msg/Twist`
 
 **Control loop (10 Hz timer):**
-
 ```python
-# Step 1: Human timeout check
-age = now - last_human_time
-if age > HUMAN_TIMEOUT:
+# 1. Human timeout
+if now - last_human_time > HUMAN_TIMEOUT:
     publish_stop(); return
 
-# Step 2: Obstacle check (details in Phase 8)
+# 2. Obstacle check (Phase 8 detail)
 if front_min < OBSTACLE_STOP_DISTANCE:
     publish_stop(); return
 
-# Step 3: Coordinate transform to robot frame
+# 3. Robot-frame transform
 dx = human_world_x - robot_x
 dy = human_world_y - robot_y
 human_x_local =  cos(yaw)*dx + sin(yaw)*dy
 human_y_local = -sin(yaw)*dx + cos(yaw)*dy
 
-# Step 4: Distance
+# 4. Distance
 d = sqrt(human_x_local**2 + human_y_local**2)
 
-# Step 5: Velocity commands
+# 5. Velocity
 if d <= TARGET_DISTANCE:
     linear_x = 0.0
 else:
@@ -470,7 +546,7 @@ else:
 angular_z = max(-MAX_ANGULAR_SPEED,
                 min(K_ANGLE * human_y_local, MAX_ANGULAR_SPEED))
 
-# Step 6: Publish
+# 6. Publish Twist
 ```
 
 **Throttled status log (~1 Hz):**
@@ -485,14 +561,23 @@ Human: DETECTED | Dist: 1.37m | Obstacle: CLEAR | State: FOLLOW | v=0.08 w=0.12
 **Verify:**
 ```bash
 ros2 topic echo /cmd_vel
-# Non-zero linear.x when human is >1.2m away
-# Positive angular.z when human is to the left
+# non-zero linear.x while human is >1.2m away
+# positive angular.z when human is to the left
 ```
 
 **Pass criteria:**
-- Cart follows human forward.
-- Cart turns correctly left/right.
-- Cart stops forward motion when within 1.2 m.
+- Cart follows human forward when distance > 1.2 m.
+- Cart turns left when `human_y > 0`, right when `human_y < 0`.
+- Cart stops forward motion when distance ≤ 1.2 m.
+
+#### Git Step — Phase 7
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_human/ smartcart_ws/src/smartcart_gazebo/launch/
+git commit -m "phase 7: follow_controller, proportional control, human following verified"
+git push origin main
+```
 
 ---
 
@@ -500,9 +585,9 @@ ros2 topic echo /cmd_vel
 
 **Goal:** Cart stops when any obstacle enters the front 60° LiDAR sector within 0.6 m.
 
-**Implementation inside `follow_controller.py` (from Phase 7).**
+**Implementation inside `follow_controller.py` (already started in Phase 7).**
 
-**LiDAR processing (from spec section G):**
+**LiDAR processing algorithm (from spec §G):**
 ```python
 def get_front_min_range(scan):
     front_min = float('inf')
@@ -525,15 +610,24 @@ def get_front_min_range(scan):
 
 **Verify:**
 ```bash
-# Move obstacle box to x=0.3, y=0 (in front of cart) via Gazebo GUI
+# Move obstacle box in front of cart via Gazebo GUI
 ros2 topic echo /cmd_vel
-# linear.x must be 0.0 while obstacle is within 0.6m
+# linear.x must be 0.0 while obstacle is within 0.6 m
 ```
 
 **Pass criteria:**
 - Cart stops for obstacle < 0.6 m in front.
-- NaN/inf/out-of-range LiDAR values silently ignored.
+- NaN/inf/out-of-range LiDAR values silently ignored (no crash).
 - Zero velocity published on node shutdown.
+
+#### Git Step — Phase 8
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_human/
+git commit -m "phase 8: obstacle emergency stop, LiDAR front-sector filter verified"
+git push origin main
+```
 
 ---
 
@@ -543,7 +637,7 @@ ros2 topic echo /cmd_vel
 
 **File:** `smartcart_human/smartcart_human/rfid_simulator.py`
 
-**Product table (exact, from spec section K):**
+**Product table (exact from spec §K):**
 ```python
 PRODUCTS = {
     "RFID001": ("Milk",    40.0),
@@ -555,11 +649,11 @@ PRODUCTS = {
 
 **Behavior:**
 - Print available tags on startup.
-- Read RFID tag ID from `stdin` in background thread.
-- Known tag, not in cart → add to cart, publish to `/rfid/item`, print cart + total.
-- Known tag, already in cart → print "Already in cart: Milk".
-- Unknown tag → print "Unknown RFID tag: RFIDXXX", do not crash.
-- Input `clear` or `c` → empty cart, print "Cart cleared. Total: ₹0".
+- Read tag ID from `stdin` in a background thread.
+- **Known tag, not in cart** → add to cart dict, publish to `/rfid/item`, print cart + total.
+- **Known tag, already in cart** → print "Already in cart: Milk".
+- **Unknown tag** → print "Unknown RFID tag: RFIDXXX", do not crash.
+- **Input `clear` or `c`** → empty cart, print "Cart cleared. Total: ₹0".
 
 **Publisher:** `/rfid/item` → `std_msgs/msg/String`
 
@@ -568,33 +662,44 @@ PRODUCTS = {
 ros2 run smartcart_human rfid_simulator
 ```
 
-**Pass criteria (from spec Test U):**
+**Pass criteria (spec Test U):**
 
-| Input | Expected Output |
+| Input | Expected |
 |---|---|
 | `RFID001` | Milk, ₹40, Total ₹40 |
 | `RFID002` | Bread, ₹35, Total ₹75 |
 | `RFID003` | Apple, ₹20, Total ₹95 |
-| `RFID001` (again) | Already in cart |
-| `RFID999` | Unknown RFID tag: RFID999 |
-| `clear` | Cart cleared. Total: ₹0 |
+| `RFID001` again | "Already in cart", total stays ₹95 |
+| `RFID999` | "Unknown RFID tag: RFID999", no crash |
+| `clear` | "Cart cleared. Total: ₹0" |
+
+#### Git Step — Phase 9
+
+```bash
+cd ~/smartcart_simulation
+git add smartcart_ws/src/smartcart_human/
+git commit -m "phase 9: RFID simulator, product lookup, duplicate prevention, running total"
+git push origin main
+```
 
 ---
 
 ### PHASE 10 — Integrated Launch + Final Validation
 
-**Goal:** One-command launch starts complete simulation; all acceptance criteria met.
+**Goal:** One-command launch starts complete simulation; all 16 acceptance criteria pass.
 
 **Final `smartcart.launch.py` node list:**
 
-| Process | Package | Executable/Command |
+| Process | Package | Role |
 |---|---|---|
-| Gazebo | `ros_gz_sim` | `gz_server` with `smartcart_world.sdf` |
-| robot_state_publisher | `robot_state_publisher` | reads URDF from xacro |
-| SmartCart spawn | `ros_gz_sim` | `create` action |
-| ROS-Gz bridge | `ros_gz_bridge` | `/scan`, `/wheel/odometry` |
-| human_controller | `smartcart_human` | `human_controller` |
-| follow_controller | `smartcart_human` | `follow_controller` |
+| Gazebo Harmonic | `ros_gz_sim` | Simulation engine, loads `smartcart_world.sdf` |
+| `robot_state_publisher` | `robot_state_publisher` | Broadcasts TF from URDF |
+| SmartCart spawn | `ros_gz_sim` | Spawns cart at x=0, y=0, z=0.3 |
+| ROS-Gz bridge | `ros_gz_bridge` | Bridges `/scan`, `/wheel/odometry` |
+| `human_controller` | `smartcart_human` | Moves human, publishes `/human/pose` |
+| `follow_controller` | `smartcart_human` | Subscribes `/human/pose`+`/scan`, publishes `/cmd_vel` |
+
+**RFID remains in a separate interactive terminal.**
 
 **Final demo commands:**
 ```bash
@@ -609,7 +714,7 @@ source ~/smartcart_simulation/smartcart_ws/install/setup.bash
 ros2 run smartcart_human rfid_simulator
 ```
 
-**Full acceptance test matrix:**
+**Full acceptance test matrix (spec §V):**
 
 | # | Test | Input | Expected |
 |---|---|---|---|
@@ -630,8 +735,17 @@ ros2 run smartcart_human rfid_simulator
 | 15 | RFID total | 001+002+003 | ₹95 |
 | 16 | Shutdown | kill controller | zero velocity published |
 
-**Completion definition (from spec section Z):**
+**Completion definition (spec §Z):**
 All 16 tests pass on a clean machine with a clean `colcon build`.
+
+#### Git Step — Phase 10 (Final)
+
+```bash
+cd ~/smartcart_simulation
+git add .
+git commit -m "phase 10: integrated launch complete, all 16 acceptance tests passing"
+git push origin main
+```
 
 ---
 
@@ -640,10 +754,11 @@ All 16 tests pass on a clean machine with a clean `colcon build`.
 - ❌ No Nav2, SLAM, YOLO, OpenCV, ML, lifecycle nodes, action servers.
 - ❌ No custom message packages, no frontend/backend/database.
 - ✅ Only `install(DIRECTORY ...)` directories that actually exist on disk.
-- ✅ Fix one phase fully before proceeding to the next.
+- ✅ Fix one phase fully — including tests — before committing or proceeding.
 - ✅ Named constants only — no magic numbers in controller logic.
 - ✅ All stop conditions → `linear.x = 0.0, angular.z = 0.0`.
 - ✅ Throttle logs — do not flood terminal.
 - ✅ `follow_controller` publishes zero `Twist` on shutdown.
-- ✅ Human must have collision geometry (for LiDAR detection).
-- ✅ Shelves, walls, floor must have collision geometry.
+- ✅ Human must have collision geometry (required for LiDAR detection).
+- ✅ Shelves, walls, floor must all have collision geometry.
+- ✅ `build/`, `install/`, `log/` must never be committed to Git.
