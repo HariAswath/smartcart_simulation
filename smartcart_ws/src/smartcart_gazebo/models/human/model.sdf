@@ -1,0 +1,158 @@
+<?xml version="1.0"?>
+<sdf version="1.8">
+  <model name="human">
+    <static>false</static>
+    <link name="human_link">
+      <inertial>
+        <pose>0 0 0.9 0 0 0</pose>
+        <mass>70.0</mass>
+        <inertia>
+          <ixx>15.0</ixx>
+          <ixy>0.0</ixy>
+          <ixz>0.0</ixz>
+          <iyy>15.0</iyy>
+          <iyz>0.0</iyz>
+          <izz>4.0</izz>
+        </inertia>
+      </inertial>
+
+      <!-- Head Visual & Collision -->
+      <visual name="head_visual">
+        <pose>0 0 1.55 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.15</radius>
+          </sphere>
+        </geometry>
+        <material>
+          <ambient>0.9 0.75 0.6 1.0</ambient>
+          <diffuse>0.9 0.75 0.6 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="head_collision">
+        <pose>0 0 1.55 0 0 0</pose>
+        <geometry>
+          <sphere>
+            <radius>0.15</radius>
+          </sphere>
+        </geometry>
+      </collision>
+
+      <!-- Torso Visual & Collision -->
+      <visual name="torso_visual">
+        <pose>0 0 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.3 0.45 0.6</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.2 0.7 0.3 1.0</ambient>
+          <diffuse>0.2 0.7 0.3 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="torso_collision">
+        <pose>0 0 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.3 0.45 0.6</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Left Arm Visual & Collision -->
+      <visual name="left_arm_visual">
+        <pose>0 0.3 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.12 0.55</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.2 0.7 0.3 1.0</ambient>
+          <diffuse>0.2 0.7 0.3 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="left_arm_collision">
+        <pose>0 0.3 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.12 0.55</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Right Arm Visual & Collision -->
+      <visual name="right_arm_visual">
+        <pose>0 -0.3 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.12 0.55</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.2 0.7 0.3 1.0</ambient>
+          <diffuse>0.2 0.7 0.3 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="right_arm_collision">
+        <pose>0 -0.3 1.1 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.12 0.12 0.55</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Left Leg Visual & Collision -->
+      <visual name="left_leg_visual">
+        <pose>0 0.12 0.4 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.18 0.16 0.8</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.6 1.0</ambient>
+          <diffuse>0.1 0.2 0.6 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="left_leg_collision">
+        <pose>0 0.12 0.4 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.18 0.16 0.8</size>
+          </box>
+        </geometry>
+      </collision>
+
+      <!-- Right Leg Visual & Collision -->
+      <visual name="right_leg_visual">
+        <pose>0 -0.12 0.4 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.18 0.16 0.8</size>
+          </box>
+        </geometry>
+        <material>
+          <ambient>0.1 0.2 0.6 1.0</ambient>
+          <diffuse>0.1 0.2 0.6 1.0</diffuse>
+          <specular>0.1 0.1 0.1 1.0</specular>
+        </material>
+      </visual>
+      <collision name="right_leg_collision">
+        <pose>0 -0.12 0.4 0 0 0</pose>
+        <geometry>
+          <box>
+            <size>0.18 0.16 0.8</size>
+          </box>
+        </geometry>
+      </collision>
+    </link>
+  </model>
+</sdf>

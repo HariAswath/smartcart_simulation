@@ -1,0 +1,308 @@
+<?xml version="1.0"?>
+<sdf version="1.8">
+  <world name="smartcart_world">
+    <physics name="1ms" type="ignored">
+      <max_step_size>0.001</max_step_size>
+      <real_time_factor>1.0</real_time_factor>
+    </physics>
+
+    <plugin
+      filename="gz-sim-physics-system"
+      name="gz::sim::systems::Physics">
+    </plugin>
+    <plugin
+      filename="gz-sim-user-commands-system"
+      name="gz::sim::systems::UserCommands">
+    </plugin>
+    <plugin
+      filename="gz-sim-scene-broadcaster-system"
+      name="gz::sim::systems::SceneBroadcaster">
+    </plugin>
+    <plugin
+      filename="gz-sim-sensors-system"
+      name="gz::sim::systems::Sensors">
+      <render_engine>ogre2</render_engine>
+    </plugin>
+
+    <!-- Sunlight -->
+    <light type="directional" name="sun">
+      <cast_shadows>true</cast_shadows>
+      <pose>0 0 10 0 0 0</pose>
+      <diffuse>0.8 0.8 0.8 1</diffuse>
+      <specular>0.2 0.2 0.2 1</specular>
+      <direction>-0.5 0.1 -0.9</direction>
+    </light>
+
+    <!-- Supermarket Floor (12m x 8m) -->
+    <model name="supermarket_floor">
+      <static>true</static>
+      <link name="floor_link">
+        <collision name="floor_collision">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12 8</size>
+            </plane>
+          </geometry>
+        </collision>
+        <visual name="floor_visual">
+          <geometry>
+            <plane>
+              <normal>0 0 1</normal>
+              <size>12 8</size>
+            </plane>
+          </geometry>
+          <material>
+            <ambient>0.85 0.85 0.85 1.0</ambient>
+            <diffuse>0.85 0.85 0.85 1.0</diffuse>
+            <specular>0.2 0.2 0.2 1.0</specular>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- North Wall -->
+    <model name="wall_north">
+      <static>true</static>
+      <pose>0 4.0 1.25 0 0 0</pose>
+      <link name="wall_north_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>12.0 0.2 2.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>12.0 0.2 2.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.75 1.0</ambient>
+            <diffuse>0.7 0.7 0.75 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- South Wall -->
+    <model name="wall_south">
+      <static>true</static>
+      <pose>0 -4.0 1.25 0 0 0</pose>
+      <link name="wall_south_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>12.0 0.2 2.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>12.0 0.2 2.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.75 1.0</ambient>
+            <diffuse>0.7 0.7 0.75 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- East Wall -->
+    <model name="wall_east">
+      <static>true</static>
+      <pose>6.0 0 1.25 0 0 0</pose>
+      <link name="wall_east_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2 8.0 2.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2 8.0 2.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.75 1.0</ambient>
+            <diffuse>0.7 0.7 0.75 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West Wall - Segment 1 (North of Entrance) -->
+    <model name="wall_west_seg1">
+      <static>true</static>
+      <pose>-6.0 2.5 1.25 0 0 0</pose>
+      <link name="wall_west_seg1_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2 3.0 2.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2 3.0 2.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.75 1.0</ambient>
+            <diffuse>0.7 0.7 0.75 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- West Wall - Segment 2 (South of Entrance) -->
+    <model name="wall_west_seg2">
+      <static>true</static>
+      <pose>-6.0 -2.5 1.25 0 0 0</pose>
+      <link name="wall_west_seg2_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>0.2 3.0 2.5</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>0.2 3.0 2.5</size></box>
+          </geometry>
+          <material>
+            <ambient>0.7 0.7 0.75 1.0</ambient>
+            <diffuse>0.7 0.7 0.75 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Checkout Counter -->
+    <model name="checkout_counter">
+      <static>true</static>
+      <pose>4.5 3.0 0.5 0 0 0</pose>
+      <link name="counter_link">
+        <collision name="collision">
+          <geometry>
+            <box><size>1.5 0.6 1.0</size></box>
+          </geometry>
+        </collision>
+        <visual name="visual">
+          <geometry>
+            <box><size>1.5 0.6 1.0</size></box>
+          </geometry>
+          <material>
+            <ambient>0.3 0.3 0.35 1.0</ambient>
+            <diffuse>0.3 0.3 0.35 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Supermarket Shelves (Left Row: y=2.5) -->
+    <model name="shelf_left_1">
+      <static>true</static>
+      <pose>-3.0 2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="shelf_left_2">
+      <static>true</static>
+      <pose>0.0 2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="shelf_left_3">
+      <static>true</static>
+      <pose>3.0 2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Supermarket Shelves (Right Row: y=-2.5) -->
+    <model name="shelf_right_1">
+      <static>true</static>
+      <pose>-3.0 -2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="shelf_right_2">
+      <static>true</static>
+      <pose>0.0 -2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <model name="shelf_right_3">
+      <static>true</static>
+      <pose>3.0 -2.5 0.75 0 0 0</pose>
+      <link name="shelf_link">
+        <collision name="collision">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+        </collision>
+        <visual name="visual">
+          <geometry><box><size>2.0 0.6 1.5</size></box></geometry>
+          <material>
+            <ambient>0.8 0.6 0.2 1.0</ambient>
+            <diffuse>0.8 0.6 0.2 1.0</diffuse>
+          </material>
+        </visual>
+      </link>
+    </model>
+
+    <!-- Simulated Human Model (Initial Pose: x=2.0, y=0.0, z=0.0) -->
+    <include>
+      <name>human</name>
+      <uri>model://human</uri>
+      <pose>2.0 0.0 0.0 0 0 0</pose>
+    </include>
+
+  </world>
+</sdf>
