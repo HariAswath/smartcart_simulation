@@ -59,9 +59,25 @@ def generate_launch_description():
         ]
     )
 
+    # ROS-Gazebo Bridge for cmd_vel and odometry
+    bridge_node = Node(
+        package='ros_gz_bridge',
+        executable='parameter_bridge',
+        name='ros_gz_bridge',
+        output='screen',
+        arguments=[
+            '/cmd_vel@geometry_msgs/msg/Twist@gz.msgs.Twist',
+            '/wheel/odometry@nav_msgs/msg/Odometry@gz.msgs.Odometry',
+        ],
+        parameters=[{
+            'use_sim_time': True
+        }]
+    )
+
     return LaunchDescription([
         set_gz_resource_path,
         start_gazebo,
         robot_state_publisher_node,
-        spawn_smartcart_node
+        spawn_smartcart_node,
+        bridge_node
     ])
