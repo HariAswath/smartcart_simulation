@@ -23,8 +23,8 @@ def generate_launch_description():
     # Launch arguments
     human_mode_arg = DeclareLaunchArgument(
         'human_mode',
-        default_value='auto',
-        description='Human control mode: auto (autonomous patrol) or manual (keyboard teleop)'
+        default_value='manual',
+        description='Human control mode: manual (user keyboard teleop) or auto (autonomous patrol)'
     )
 
     # Environment variable for Gazebo models resource path

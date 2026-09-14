@@ -3,13 +3,14 @@
 Human Controller Node for SmartCart Simulation.
 
 Controls the movement of the simulated human in Gazebo:
-- Auto mode: Smoothly oscillates along the aisle (preserving test compatibility).
-- Manual/Teleop mode: Subscribes to `/human/cmd_vel` (geometry_msgs/msg/Twist)
-  to allow real-time keyboard or joystick teleoperation anywhere in the supermarket.
+- Manual/Teleop mode (default): Human is completely stationary until user actively commands
+  velocity via `/human/cmd_vel` (geometry_msgs/msg/Twist).
+- Wall-clock decay: Instantly zeroes velocity within 150ms when user releases keys.
 - Publishes the human's world position and orientation to `/human/pose` (geometry_msgs/msg/Pose).
 """
 
 import math
+import time
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Pose, Twist
@@ -18,19 +19,19 @@ from ros_gz_interfaces.msg import Entity
 
 
 class HumanController(Node):
-    """Controls simulated human movement (Auto or Manual Teleop) and publishes /human/pose."""
+    """Controls simulated human movement and publishes /human/pose."""
 
     def __init__(self):
         super().__init__('human_controller')
 
-        # Parameters
-        self.declare_parameter('mode', 'auto')        # 'auto' or 'manual'
+        # Parameters (Default: manual stationary mode, moved exclusively by user)
+        self.declare_parameter('mode', 'manual')       # 'manual' (default) or 'auto'
         self.declare_parameter('start_x', 2.0)
         self.declare_parameter('start_y', 0.0)
         self.declare_parameter('start_yaw', 0.0)
         self.declare_parameter('end_x', 6.0)
-        self.declare_parameter('speed', 0.2)          # m/s in auto mode
-        self.declare_parameter('update_rate', 20.0)   # 20 Hz for smooth walking
+        self.declare_parameter('speed', 0.2)           # m/s in auto mode
+        self.declare_parameter('update_rate', 20.0)    # 20 Hz for smooth walking
         self.declare_parameter('entity_name', 'human')
 
         self.mode = self.get_parameter('mode').get_parameter_value().string_value
@@ -54,14 +55,14 @@ class HumanController(Node):
         self.teleop_vx = 0.0
         self.teleop_vy = 0.0
         self.teleop_wz = 0.0
-        self.last_cmd_time = None
+        self.last_cmd_wall_time = None
 
         # Publisher for human position
         self.pose_pub = self.create_publisher(Pose, '/human/pose', 10)
 
-        # Subscriber for manual teleop commands
+        # Subscriber for manual teleop commands (queue depth 1 for zero-latency response)
         self.cmd_sub = self.create_subscription(
-            Twist, '/human/cmd_vel', self.cmd_callback, 10
+            Twist, '/human/cmd_vel', self.cmd_callback, 1
         )
 
         # Service client for setting Gazebo entity pose
@@ -77,7 +78,7 @@ class HumanController(Node):
         self.service_connected = False
         self.log_counter = 0
 
-        self.get_logger().info(f'Human controller started in [{self.mode.upper()}] mode')
+        self.get_logger().info(f'Human controller initialized in [{self.mode.upper()}] mode (User Controlled)')
 
         # 20 Hz Timer Loop
         self.timer = self.create_timer(self.dt, self.timer_callback)
@@ -87,9 +88,9 @@ class HumanController(Node):
         self.teleop_vx = msg.linear.x
         self.teleop_vy = msg.linear.y
         self.teleop_wz = msg.angular.z
-        self.last_cmd_time = self.get_clock().now()
+        self.last_cmd_wall_time = time.time()
 
-        # Seamlessly switch to manual mode if teleop command is received
+        # Switch to manual mode if a teleop command is received
         if self.mode != 'manual':
             self.mode = 'manual'
             self.get_logger().info('Switched human controller to [MANUAL TELEOP] mode via /human/cmd_vel')
@@ -100,17 +101,16 @@ class HumanController(Node):
         if not self.service_connected:
             if self.set_pose_client.service_is_ready():
                 self.service_connected = True
-                self.get_logger().info('Gazebo set_pose service connected. Human movement active.')
+                self.get_logger().info('Gazebo set_pose service connected. Ready for user control.')
             else:
                 if self.log_counter % 40 == 0:
                     self.get_logger().info('Waiting for Gazebo set_pose service...')
                 self.log_counter += 1
 
         if self.mode == 'manual':
-            # Timeout check: if no teleop command received for > 0.5s, decelerate to 0
-            if self.last_cmd_time is not None:
-                age = (self.get_clock().now() - self.last_cmd_time).nanoseconds / 1e9
-                if age > 0.5:
+            # Wall-clock fast decay timeout: if no active keypress received for > 0.15s, stop immediately
+            if self.last_cmd_wall_time is not None:
+                if (time.time() - self.last_cmd_wall_time) > 0.15:
                     self.teleop_vx = 0.0
                     self.teleop_vy = 0.0
                     self.teleop_wz = 0.0
@@ -171,9 +171,11 @@ class HumanController(Node):
         # Throttled status logging (~1 Hz)
         if self.log_counter % 20 == 0:
             yaw_deg = math.degrees(self.current_yaw)
+            is_moving = abs(self.teleop_vx) > 0.01 or abs(self.teleop_vy) > 0.01 or abs(self.teleop_wz) > 0.01
+            status_str = "WALKING" if is_moving else "STATIONARY"
             self.get_logger().info(
-                f'[{self.mode.upper()}] Human Pose: x={self.current_x:.2f}m, y={self.current_y:.2f}m, '
-                f'yaw={yaw_deg:.1f}°'
+                f'[{self.mode.upper()}] Human: ({self.current_x:.2f}m, {self.current_y:.2f}m) | '
+                f'Yaw: {yaw_deg:.1f}° | State: {status_str}'
             )
         self.log_counter += 1
 
