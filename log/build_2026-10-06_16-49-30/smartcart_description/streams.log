@@ -1,0 +1,43 @@
+[0.079s] Invoking command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake /home/sai/Projects/smartcart_simulation/smartcart_ws/src/smartcart_description -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/sai/Projects/smartcart_simulation/install/smartcart_description
+[0.741s] -- The C compiler identification is GNU 13.3.0
+[2.956s] -- The CXX compiler identification is GNU 13.3.0
+[5.119s] -- Detecting C compiler ABI info
+[5.904s] -- Detecting C compiler ABI info - done
+[5.920s] -- Check for working C compiler: /usr/bin/cc - skipped
+[5.949s] -- Detecting C compile features
+[5.950s] -- Detecting C compile features - done
+[6.268s] -- Detecting CXX compiler ABI info
+[7.041s] -- Detecting CXX compiler ABI info - done
+[7.056s] -- Check for working CXX compiler: /usr/bin/c++ - skipped
+[7.057s] -- Detecting CXX compile features
+[7.057s] -- Detecting CXX compile features - done
+[7.096s] -- Found ament_cmake: 2.5.6 (/opt/ros/jazzy/share/ament_cmake/cmake)
+[7.410s] -- Found Python3: /usr/bin/python3 (found version "3.12.3") found components: Interpreter 
+[7.621s] -- Override CMake install command with custom implementation using symlinks instead of copying resources
+[7.958s] -- Configuring done (7.9s)
+[7.972s] -- Generating done (0.0s)
+[7.976s] -- Build files have been written to: /home/sai/Projects/smartcart_simulation/build/smartcart_description
+[7.986s] Invoked command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake /home/sai/Projects/smartcart_simulation/smartcart_ws/src/smartcart_description -DAMENT_CMAKE_SYMLINK_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/home/sai/Projects/smartcart_simulation/install/smartcart_description
+[7.989s] Invoking command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --build /home/sai/Projects/smartcart_simulation/build/smartcart_description -- -j8 -l8
+[8.090s] Invoked command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --build /home/sai/Projects/smartcart_simulation/build/smartcart_description -- -j8 -l8
+[8.115s] Invoking command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --install /home/sai/Projects/smartcart_simulation/build/smartcart_description
+[8.135s] -- Install configuration: ""
+[8.136s] -- Execute custom install script
+[8.139s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/urdf/.gitkeep
+[8.162s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/urdf/smartcart.urdf.xacro
+[8.187s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/ament_index/resource_index/package_run_dependencies/smartcart_description
+[8.211s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/ament_index/resource_index/parent_prefix_path/smartcart_description
+[8.236s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/environment/ament_prefix_path.sh
+[8.259s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/environment/ament_prefix_path.dsv
+[8.282s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/environment/path.sh
+[8.307s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/environment/path.dsv
+[8.333s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/local_setup.bash
+[8.362s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/local_setup.sh
+[8.386s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/local_setup.zsh
+[8.411s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/local_setup.dsv
+[8.435s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/package.dsv
+[8.460s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/ament_index/resource_index/packages/smartcart_description
+[8.484s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/cmake/smartcart_descriptionConfig.cmake
+[8.506s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/cmake/smartcart_descriptionConfig-version.cmake
+[8.528s] -- Symlinking: /home/sai/Projects/smartcart_simulation/install/smartcart_description/share/smartcart_description/package.xml
+[8.557s] Invoked command in '/home/sai/Projects/smartcart_simulation/build/smartcart_description' returned '0': CMAKE_PREFIX_PATH=${CMAKE_PREFIX_PATH}:/opt/ros/jazzy /usr/bin/cmake --install /home/sai/Projects/smartcart_simulation/build/smartcart_description
