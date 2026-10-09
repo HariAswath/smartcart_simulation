@@ -2,32 +2,38 @@
 """
 Follow Controller Node for SmartCart Simulation.
 
-Tracks simulated human position, applies smooth proportional differential-drive
-skid-steer control, handles 360-degree turnaround with hysteresis, monitors
-LiDAR front sector for obstacle safety, and allows in-place rotation toward human.
+Tracks target position produced by the Perception/Target Selection layer:
+- Subscribes to `/target/pose` (with fallback to `/human_1/pose` and `/human/pose`).
+- Monitors `/target/status` to adjust dynamics during occlusion (coasting) or stop on lost target.
+- Applies smooth proportional differential-drive skid-steer control.
+- Handles 360-degree turnaround with hysteresis.
+- Monitors LiDAR front sector for obstacle safety and emergency braking.
 """
 
+import json
 import math
 import rclpy
 from rclpy.node import Node
 from geometry_msgs.msg import Twist, Pose
 from sensor_msgs.msg import LaserScan
 from nav_msgs.msg import Odometry
+from std_msgs.msg import String
 
 
 # Controller Constants (Authoritative Specification Contract)
 TARGET_DISTANCE = 1.20          # Target following distance in meters
 DEADBAND_DISTANCE = 0.05       # Deadband around target distance (m)
-K_DISTANCE = 0.60              # Proportional gain for linear velocity
+K_DISTANCE = 0.70              # Proportional gain for linear velocity
 K_ANGLE = 1.20                 # Proportional gain for angular velocity
 MAX_LINEAR_SPEED = 0.45        # Maximum linear speed (m/s)
+MIN_LINEAR_SPEED = 0.18        # Minimum linear speed to overcome 4WD ground friction
 MAX_ANGULAR_SPEED = 1.00       # Maximum angular speed (rad/s)
 MIN_ANGULAR_SPEED = 0.30       # Minimum angular speed to overcome skid friction
 DEADBAND_ANGLE = 0.08          # ~4.5 degrees angular deadband (rad)
-OBSTACLE_STOP_DISTANCE = 0.60  # Emergency stop threshold (meters)
-HUMAN_TIMEOUT = 1.0            # Lost human timeout in seconds
+OBSTACLE_STOP_DISTANCE = 0.45  # Emergency stop threshold from LiDAR (meters)
+HUMAN_TIMEOUT = 1.5            # Lost human timeout in seconds
 FRONT_SECTOR_RAD = math.pi / 6 # ±30 degrees front safety cone
-MIN_VALID_LIDAR_DIST = 0.20    # Filter internal sensor reflections
+MIN_VALID_LIDAR_DIST = 0.18    # Filter internal sensor reflections
 
 
 class FollowController(Node):
@@ -36,13 +42,37 @@ class FollowController(Node):
     def __init__(self):
         super().__init__('follow_controller')
 
+        # Parameters
+        self.declare_parameter('target_pose_topic', '/target/pose')
+        self.declare_parameter('target_human_id', 1)
+
+        self.target_pose_topic = self.get_parameter('target_pose_topic').get_parameter_value().string_value
+        self.target_human_id = self.get_parameter('target_human_id').get_parameter_value().integer_value
+
         # Publisher for robot velocity
         self.cmd_pub = self.create_publisher(Twist, '/cmd_vel', 10)
 
-        # Subscribers
-        self.human_sub = self.create_subscription(
-            Pose, '/human/pose', self.human_callback, 10
+        # Primary target subscriber
+        self.target_sub = self.create_subscription(
+            Pose, self.target_pose_topic, self.target_callback, 10
         )
+
+        # Fallback subscriptions for direct human pose
+        if self.target_pose_topic != '/human_1/pose':
+            self.create_subscription(
+                Pose, '/human_1/pose', self.fallback_human_cb, 10
+            )
+        if self.target_pose_topic != '/human/pose':
+            self.create_subscription(
+                Pose, '/human/pose', self.fallback_human_cb, 10
+            )
+
+        # Perception status subscriber
+        self.create_subscription(
+            String, '/target/status', self.status_callback, 10
+        )
+
+        # Sensor subscribers
         self.scan_sub = self.create_subscription(
             LaserScan, '/scan', self.scan_callback, 10
         )
@@ -51,8 +81,9 @@ class FollowController(Node):
         )
 
         # State tracking
-        self.last_human_pose = None
-        self.last_human_time = None
+        self.last_target_pose = None
+        self.last_target_time = None
+        self.target_status_data = None
         self.last_scan = None
         self.robot_x = 0.0
         self.robot_y = 0.0
@@ -63,22 +94,32 @@ class FollowController(Node):
         self.turn_direction = 1.0
         self.log_counter = 0
 
-        self.get_logger().info('Follow controller started with robust 360° skid-steer tracking')
+        self.get_logger().info(f'Follow controller initialized listening to [{self.target_pose_topic}]')
 
         # 10 Hz Control Loop Timer
         self.timer = self.create_timer(0.1, self.control_loop)
 
-    def human_callback(self, msg: Pose):
-        """Record latest human pose and arrival timestamp."""
-        self.last_human_pose = msg
-        self.last_human_time = self.get_clock().now()
+    def target_callback(self, msg: Pose):
+        """Record latest target pose and arrival timestamp."""
+        self.last_target_pose = msg
+        self.last_target_time = self.get_clock().now()
+
+    def fallback_human_cb(self, msg: Pose):
+        """Use ground-truth fallback only if primary target is not yet received."""
+        if self.last_target_pose is None:
+            self.last_target_pose = msg
+            self.last_target_time = self.get_clock().now()
+
+    def status_callback(self, msg: String):
+        try:
+            self.target_status_data = json.loads(msg.data)
+        except Exception:
+            pass
 
     def scan_callback(self, msg: LaserScan):
-        """Record latest LiDAR scan."""
         self.last_scan = msg
 
     def odom_callback(self, msg: Odometry):
-        """Extract planar robot pose (x, y, yaw) from odometry using full 3D quaternion."""
         self.robot_x = msg.pose.pose.position.x
         self.robot_y = msg.pose.pose.position.y
 
@@ -92,39 +133,27 @@ class FollowController(Node):
         self.robot_yaw = math.atan2(siny_cosp, cosy_cosp)
         self.odom_received = True
 
-    def get_human_age(self) -> float:
-        """Calculate time elapsed since last human pose in seconds."""
-        if self.last_human_time is None:
+    def get_target_age(self) -> float:
+        if self.last_target_time is None:
             return float('inf')
-        duration = self.get_clock().now() - self.last_human_time
+        duration = self.get_clock().now() - self.last_target_time
         return duration.nanoseconds / 1e9
 
     def calculate_relative_position(self, hx: float, hy: float) -> tuple:
-        """
-        Transform human world position (hx, hy) to robot-local coordinates.
-        Returns: (human_x_local, human_y_local)
-          +X: directly in front of the robot
-          +Y: to the robot's left
-        """
         dx = hx - self.robot_x
         dy = hy - self.robot_y
 
         cos_yaw = math.cos(self.robot_yaw)
         sin_yaw = math.sin(self.robot_yaw)
 
-        human_x = cos_yaw * dx + sin_yaw * dy
-        human_y = -sin_yaw * dx + cos_yaw * dy
-        return human_x, human_y
+        target_x = cos_yaw * dx + sin_yaw * dy
+        target_y = -sin_yaw * dx + cos_yaw * dy
+        return target_x, target_y
 
-    def calculate_distance(self, human_x: float, human_y: float) -> float:
-        """Calculate Euclidean distance to human in robot frame."""
-        return math.sqrt(human_x * human_x + human_y * human_y)
+    def calculate_distance(self, target_x: float, target_y: float) -> float:
+        return math.sqrt(target_x * target_x + target_y * target_y)
 
     def get_front_min_range(self) -> float:
-        """
-        Scan LiDAR ranges in the front ±30 degree cone.
-        Returns minimum valid obstacle range in meters, ignoring reflections < 0.20m.
-        """
         if self.last_scan is None:
             return float('inf')
 
@@ -136,7 +165,6 @@ class FollowController(Node):
             if -FRONT_SECTOR_RAD <= angle <= FRONT_SECTOR_RAD:
                 if math.isnan(r) or math.isinf(r):
                     continue
-                # Ignore out-of-range returns and internal reflections
                 if r < max(scan.range_min, MIN_VALID_LIDAR_DIST) or r > scan.range_max:
                     continue
                 if r < front_min:
@@ -145,32 +173,22 @@ class FollowController(Node):
         return front_min
 
     def is_obstacle_detected(self, front_min: float) -> bool:
-        """Check if any front obstacle is below the emergency stop threshold."""
         return front_min < OBSTACLE_STOP_DISTANCE
 
-    def calculate_angular_velocity(self, human_x: float, human_y: float) -> float:
-        """
-        Calculate robust angular velocity with 180° turnaround hysteresis
-        and skid-steer friction compensation.
-        """
-        bearing_angle = math.atan2(human_y, human_x)
+    def calculate_angular_velocity(self, target_x: float, target_y: float) -> float:
+        bearing_angle = math.atan2(target_y, target_x)
 
-        # Handle 180° turnaround hysteresis when human is behind cart
         if abs(bearing_angle) > 2.8:  # ~160°
-            # Keep previously established turn direction to prevent sign-flip jitter
             effective_bearing = self.turn_direction * abs(bearing_angle)
         else:
             self.turn_direction = 1.0 if bearing_angle >= 0.0 else -1.0
             effective_bearing = bearing_angle
 
-        # Angular deadband check
         if abs(effective_bearing) <= DEADBAND_ANGLE:
             return 0.0
 
-        # Proportional angular speed
         w = K_ANGLE * effective_bearing
 
-        # Ensure minimum angular speed to reliably overcome skid-steer ground friction
         if w > 0:
             w = max(MIN_ANGULAR_SPEED, min(w, MAX_ANGULAR_SPEED))
         else:
@@ -178,66 +196,52 @@ class FollowController(Node):
 
         return float(w)
 
-    def calculate_linear_velocity(self, distance: float, human_x: float, human_y: float, obstacle_close: bool) -> float:
-        """
-        Calculate forward linear velocity. Forward motion is disallowed if an obstacle
-        is close, or if the robot is not facing the human.
-        """
-        # Strictly zero forward drive if obstacle is close
+    def calculate_linear_velocity(self, distance: float, target_x: float, target_y: float, obstacle_close: bool, speed_scale: float = 1.0) -> float:
         if obstacle_close:
             return 0.0
 
-        bearing_angle = math.atan2(human_y, human_x)
+        bearing_angle = math.atan2(target_y, target_x)
 
-        # Only drive forward if human is in the forward half-plane within ±45 deg cone
-        if human_x > 0.0 and abs(bearing_angle) < (math.pi / 4.0):
+        if target_x > 0.0 and abs(bearing_angle) < (math.pi / 4.0):
             distance_error = distance - TARGET_DISTANCE
             if distance_error <= DEADBAND_DISTANCE:
                 return 0.0
             else:
-                linear_x = K_DISTANCE * (distance_error - DEADBAND_DISTANCE)
-                return float(max(0.0, min(linear_x, MAX_LINEAR_SPEED)))
+                linear_x = K_DISTANCE * (distance_error - DEADBAND_DISTANCE) * speed_scale
+                linear_x = max(MIN_LINEAR_SPEED, min(linear_x, MAX_LINEAR_SPEED))
+                return float(linear_x)
 
-        # Otherwise rotate on the spot
         return 0.0
 
     def publish_stop(self):
-        """Publish zero linear and angular velocities."""
         stop_cmd = Twist()
-        stop_cmd.linear.x = 0.0
-        stop_cmd.linear.y = 0.0
-        stop_cmd.linear.z = 0.0
-        stop_cmd.angular.x = 0.0
-        stop_cmd.angular.y = 0.0
-        stop_cmd.angular.z = 0.0
         self.cmd_pub.publish(stop_cmd)
 
     def control_loop(self):
-        """Main 10 Hz control loop executing prioritized safety & follow logic."""
-        # 1. Check human pose freshness
-        human_age = self.get_human_age()
-        human_lost = human_age > HUMAN_TIMEOUT
+        target_age = self.get_target_age()
+        target_lost = target_age > HUMAN_TIMEOUT
 
-        # 2. Check front obstacle safety
+        perception_state = self.target_status_data.get("state", "UNKNOWN") if self.target_status_data else "UNKNOWN"
+        if perception_state == "TARGET_LOST":
+            target_lost = True
+
         front_min = self.get_front_min_range()
         obstacle_close = self.is_obstacle_detected(front_min)
 
-        if human_lost:
-            state = "HUMAN_LOST"
+        if target_lost:
+            state = "TARGET_LOST"
             self.publish_stop()
             linear_x = 0.0
             angular_z = 0.0
             distance = 0.0
 
         else:
-            hx = self.last_human_pose.position.x
-            hy = self.last_human_pose.position.y
+            hx = self.last_target_pose.position.x
+            hy = self.last_target_pose.position.y
 
-            human_x, human_y = self.calculate_relative_position(hx, hy)
-            distance = self.calculate_distance(human_x, human_y)
+            target_x, target_y = self.calculate_relative_position(hx, hy)
+            distance = self.calculate_distance(target_x, target_y)
 
-            # Check if close obstacle is an unrelated foreign obstacle (e.g. wall/shelf)
-            # vs human standing close
             is_foreign_obstacle = obstacle_close and (distance > 0.85)
 
             if is_foreign_obstacle:
@@ -246,34 +250,31 @@ class FollowController(Node):
                 linear_x = 0.0
                 angular_z = 0.0
             else:
-                # Calculate turn velocity (always active to keep robot facing human)
-                angular_z = self.calculate_angular_velocity(human_x, human_y)
+                speed_scale = 0.60 if perception_state == "TEMPORARY_OCCLUSION" else 1.0
 
-                # Calculate forward velocity (zeroed if obstacle close or target reached)
-                linear_x = self.calculate_linear_velocity(distance, human_x, human_y, obstacle_close)
+                angular_z = self.calculate_angular_velocity(target_x, target_y)
+                linear_x = self.calculate_linear_velocity(distance, target_x, target_y, obstacle_close, speed_scale)
 
-                if obstacle_close or (distance <= (TARGET_DISTANCE + DEADBAND_DISTANCE) and human_x > 0.0):
+                if obstacle_close or (distance <= (TARGET_DISTANCE + DEADBAND_DISTANCE) and target_x > 0.0):
                     state = "TARGET_REACHED" if not obstacle_close else "PROXIMITY_HOLD"
                 else:
-                    state = "FOLLOW"
+                    state = "FOLLOW" if perception_state != "TEMPORARY_OCCLUSION" else "COAST_OCCLUDED"
 
                 cmd = Twist()
                 cmd.linear.x = float(linear_x)
                 cmd.angular.z = float(angular_z)
                 self.cmd_pub.publish(cmd)
 
-        # Throttled status log (~1 Hz)
         if self.log_counter % 10 == 0:
-            human_status = "LOST" if human_lost else "DETECTED"
+            target_status = "LOST" if target_lost else "TRACKED"
             obs_status = f"BLOCKED ({front_min:.2f}m)" if obstacle_close else "CLEAR"
             self.get_logger().info(
-                f"[{state}] Human: {human_status} | Dist: {distance:.2f}m | "
+                f"[{state}] Target: {target_status} ({perception_state}) | Dist: {distance:.2f}m | "
                 f"Obstacle: {obs_status} | v: {linear_x:.2f} m/s | w: {angular_z:.2f} rad/s"
             )
         self.log_counter += 1
 
     def destroy_node(self):
-        """Ensure robot stops on node termination."""
         self.publish_stop()
         super().destroy_node()
 

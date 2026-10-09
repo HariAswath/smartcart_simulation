@@ -1,0 +1,25 @@
+running develop
+running egg_info
+creating smartcart_human.egg-info
+writing smartcart_human.egg-info/PKG-INFO
+writing dependency_links to smartcart_human.egg-info/dependency_links.txt
+writing entry points to smartcart_human.egg-info/entry_points.txt
+writing requirements to smartcart_human.egg-info/requires.txt
+writing top-level names to smartcart_human.egg-info/top_level.txt
+writing manifest file 'smartcart_human.egg-info/SOURCES.txt'
+reading manifest file 'smartcart_human.egg-info/SOURCES.txt'
+writing manifest file 'smartcart_human.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/sai/Projects/smartcart_simulation/install/smartcart_human/lib/python3.12/site-packages/smartcart-human.egg-link (link to .)
+Installing follow_controller script to /home/sai/Projects/smartcart_simulation/install/smartcart_human/lib/smartcart_human
+Installing human_controller script to /home/sai/Projects/smartcart_simulation/install/smartcart_human/lib/smartcart_human
+Installing human_teleop script to /home/sai/Projects/smartcart_simulation/install/smartcart_human/lib/smartcart_human
+Installing rfid_simulator script to /home/sai/Projects/smartcart_simulation/install/smartcart_human/lib/smartcart_human
+
+Installed /home/sai/Projects/smartcart_simulation/build/smartcart_human
+running symlink_data
+creating /home/sai/Projects/smartcart_simulation/install/smartcart_human/share/ament_index
+creating /home/sai/Projects/smartcart_simulation/install/smartcart_human/share/ament_index/resource_index
+creating /home/sai/Projects/smartcart_simulation/install/smartcart_human/share/ament_index/resource_index/packages
+symbolically linking /home/sai/Projects/smartcart_simulation/build/smartcart_human/resource/smartcart_human -> /home/sai/Projects/smartcart_simulation/install/smartcart_human/share/ament_index/resource_index/packages
+symbolically linking /home/sai/Projects/smartcart_simulation/build/smartcart_human/package.xml -> /home/sai/Projects/smartcart_simulation/install/smartcart_human/share/smartcart_human

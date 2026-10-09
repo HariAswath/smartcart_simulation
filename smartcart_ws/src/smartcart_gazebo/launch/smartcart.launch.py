@@ -3,6 +3,7 @@ import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import ExecuteProcess, SetEnvironmentVariable, DeclareLaunchArgument
+from launch.conditions import IfCondition, UnlessCondition
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 import xacro
@@ -27,16 +28,37 @@ def generate_launch_description():
         description='Human control mode: manual (user keyboard teleop) or auto (autonomous patrol)'
     )
 
-    # Environment variable for Gazebo models resource path
+    headless_arg = DeclareLaunchArgument(
+        'headless',
+        default_value='false',
+        description='Run Gazebo in headless mode without GUI (true/false)'
+    )
+
+    # Environment variables for Gazebo models resource path
     set_gz_resource_path = SetEnvironmentVariable(
         name='GZ_SIM_RESOURCE_PATH',
         value=[models_path, ':' + os.environ.get('GZ_SIM_RESOURCE_PATH', '')]
     )
+    set_gz_file_path = SetEnvironmentVariable(
+        name='GZ_FILE_PATH',
+        value=[models_path, ':' + os.environ.get('GZ_FILE_PATH', '')]
+    )
+    set_ign_resource_path = SetEnvironmentVariable(
+        name='IGN_GAZEBO_RESOURCE_PATH',
+        value=[models_path, ':' + os.environ.get('IGN_GAZEBO_RESOURCE_PATH', '')]
+    )
 
-    # Start Gazebo Harmonic with the supermarket world
-    start_gazebo = ExecuteProcess(
+    # Start Gazebo Harmonic with the supermarket world (GUI or Headless)
+    start_gazebo_gui = ExecuteProcess(
         cmd=['gz', 'sim', '-r', world_path],
-        output='screen'
+        output='screen',
+        condition=UnlessCondition(LaunchConfiguration('headless'))
+    )
+
+    start_gazebo_headless = ExecuteProcess(
+        cmd=['gz', 'sim', '-r', '-s', '--headless-rendering', world_path],
+        output='screen',
+        condition=IfCondition(LaunchConfiguration('headless'))
     )
 
     # Robot State Publisher
@@ -86,36 +108,138 @@ def generate_launch_description():
         }]
     )
 
-    # Human Controller Node
-    human_controller_node = Node(
+    # Human 1 Controller Node (Central Aisle - Followed Target)
+    human_1_controller_node = Node(
         package='smartcart_human',
         executable='human_controller',
         name='human_controller',
+        namespace='human_1',
         output='screen',
         parameters=[{
             'use_sim_time': True,
             'mode': LaunchConfiguration('human_mode'),
+            'entity_name': 'human_1',
+            'start_x': 2.0,
+            'start_y': 0.0,
+            'start_yaw': 0.0,
+            'end_x': 10.0,
+            'publish_legacy_topic': True,
         }]
     )
 
-    # Follow Controller Node
+    # Human 2 Controller Node (Central Aisle - Bystander)
+    human_2_controller_node = Node(
+        package='smartcart_human',
+        executable='human_controller',
+        name='human_controller',
+        namespace='human_2',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'mode': LaunchConfiguration('human_mode'),
+            'entity_name': 'human_2',
+            'start_x': 3.8,
+            'start_y': 0.4,
+            'start_yaw': 0.0,
+            'end_x': 9.0,
+            'publish_legacy_topic': False,
+        }]
+    )
+
+    # Human 3 Controller Node (South Aisle C - Shopper)
+    human_3_controller_node = Node(
+        package='smartcart_human',
+        executable='human_controller',
+        name='human_controller',
+        namespace='human_3',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'mode': LaunchConfiguration('human_mode'),
+            'entity_name': 'human_3',
+            'start_x': 6.0,
+            'start_y': -4.5,
+            'start_yaw': 0.0,
+            'end_x': 10.0,
+            'publish_legacy_topic': False,
+        }]
+    )
+
+    # Human 4 Controller Node (East Checkout Area - Customer)
+    human_4_controller_node = Node(
+        package='smartcart_human',
+        executable='human_controller',
+        name='human_controller',
+        namespace='human_4',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'mode': LaunchConfiguration('human_mode'),
+            'entity_name': 'human_4',
+            'start_x': 13.0,
+            'start_y': 3.5,
+            'start_yaw': 0.0,
+            'end_x': 17.0,
+            'publish_legacy_topic': False,
+        }]
+    )
+
+    # BLE Customer Beacon Simulator Node
+    ble_simulator_node = Node(
+        package='smartcart_perception',
+        executable='ble_simulator',
+        name='ble_simulator',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'customer_tag_id': 'SMARTCART-CUSTOMER-001',
+            'target_human_id': 1
+        }]
+    )
+
+    # Perception & Target Selection Node (Camera + LiDAR + BLE + Re-ID Fusion)
+    target_selector_node = Node(
+        package='smartcart_perception',
+        executable='target_selector',
+        name='target_selector',
+        output='screen',
+        parameters=[{
+            'use_sim_time': True,
+            'target_human_id': 1,
+            'occlusion_timeout': 2.0,
+            'reid_match_thresh': 0.65
+        }]
+    )
+
+    # Follow Controller Node (SmartCart following the Perception /target/pose)
     follow_controller_node = Node(
         package='smartcart_human',
         executable='follow_controller',
         name='follow_controller',
         output='screen',
         parameters=[{
-            'use_sim_time': True
+            'use_sim_time': True,
+            'target_pose_topic': '/target/pose',
+            'target_human_id': 1
         }]
     )
 
     return LaunchDescription([
         human_mode_arg,
+        headless_arg,
         set_gz_resource_path,
-        start_gazebo,
+        set_gz_file_path,
+        set_ign_resource_path,
+        start_gazebo_gui,
+        start_gazebo_headless,
         robot_state_publisher_node,
         spawn_smartcart_node,
         bridge_node,
-        human_controller_node,
+        human_1_controller_node,
+        human_2_controller_node,
+        human_3_controller_node,
+        human_4_controller_node,
+        ble_simulator_node,
+        target_selector_node,
         follow_controller_node
     ])
